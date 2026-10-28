@@ -18,6 +18,10 @@ jobs:
     name: Build Android APK
     runs-on: ubuntu-latest
 
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -28,15 +32,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Accept Android SDK Licenses
-        run: yes | sdkmanager --licenses
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
 
       - name: Install Android SDK
         run: |
-          sdkmanager \
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
@@ -46,39 +48,34 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Verify Project Structure
+      - name: Check Project Structure
         run: |
-          echo "Checking Android project..."
-
           if [ ! -f settings.gradle.kts ] && [ ! -f settings.gradle ]; then
-            echo "ERROR: settings.gradle or settings.gradle.kts missing."
+            echo "ERROR: Gradle settings file missing from root."
             exit 1
           fi
 
           if [ ! -f app/build.gradle.kts ] && [ ! -f app/build.gradle ]; then
-            echo "ERROR: app/build.gradle or app/build.gradle.kts missing."
+            echo "ERROR: app folder or build.gradle missing."
             exit 1
           fi
 
-          echo "Android project structure found."
-
-      - name: Build Debug APK
+      - name: Build APK
         run: gradle assembleDebug --stacktrace
 
-      - name: Prepare APK
+      - name: Verify APK
         run: |
           APK="app/build/outputs/apk/debug/app-debug.apk"
 
           if [ ! -f "$APK" ]; then
-            echo "ERROR: APK was not generated."
+            echo "ERROR: APK not generated."
             exit 1
           fi
 
           mkdir -p output
           cp "$APK" output/NearChat.apk
-          ls -lh output/NearChat.apk
 
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: NearChat-APK
@@ -86,7 +83,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish GitHub Release
+      - name: Publish Release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
