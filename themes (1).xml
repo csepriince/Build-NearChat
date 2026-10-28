@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.NearChat" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#1B1D21</item>
+    </style>
+</resources>

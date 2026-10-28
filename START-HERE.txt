@@ -1,0 +1,16 @@
+SIRF 4 KAAM (files samajhne ki zaroorat nahi):
+
+1. Is zip ko EXTRACT karo (zip ko hi upload mat karna).
+2. github.com par naya repo banao (Public), "uploading an existing file" par click karo,
+   extract hue folder ke ANDAR ki saari files/folders drag-drop karo, Commit dabao.
+   (Agar .github folder upload na ho: Add file > Create new file > naam:
+    .github/workflows/build.yml  aur uska content isi zip ki wahi file se paste karo.)
+3. Repo > Settings > Pages > Source = "GitHub Actions".
+   Phir Actions tab > "Build NearChat" > Run workflow. 8-10 minute ruko.
+4. Tumhara link: https://TUMHARA-USERNAME.github.io/REPO-NAAM/
+   Is page par preview + Download APK button hoga. Ye link kisi ko bhi bhej do.
+   Seedha APK link: https://github.com/TUMHARA-USERNAME/REPO-NAAM/releases/latest/download/NearChat.apk
+
+Build fail ho to Actions ka error log mujhe paste karo.
+
+NOTE: Play Store ke liye icon: store-assets/ic_play_512.png (aapka logo, 512x512).
