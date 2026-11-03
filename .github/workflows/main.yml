@@ -1,74 +1,45 @@
-name: Build NearChat
+
+name: NearChat Android Build
+
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
-permissions:
-  contents: write
-  pages: write
-  id-token: write
-concurrency:
-  group: nearchat-build
-  cancel-in-progress: true
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
 jobs:
   build:
+    name: Build NearChat APK
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Rebuild project folders
-        run: |
-          set -e
-          P=work/NearChat
-          J=$P/app/src/main/java/com/nearchat/app
-          R=$P/app/src/main/res
-          mkdir -p $P/app/src/main $P/docs $J/core $J/ui $R/values $R/values-night $R/drawable-nodpi $R/mipmap-anydpi-v26
-          cp settings.gradle.kts gradle.properties $P/
-          for f in build.gradle*.kts; do
-            if grep -q namespace "$f"; then cp "$f" $P/app/build.gradle.kts; else cp "$f" $P/build.gradle.kts; fi
-          done
-          cp proguard-rules.pro $P/app/
-          cp AndroidManifest.xml $P/app/src/main/
-          cp MainActivity.kt $J/
-          cp App.kt Screens.kt Settings.kt Theme.kt Components.kt $J/ui/
-          cp BtController.kt ChatStore.kt Conn.kt Crypto.kt Media.kt Models.kt $J/core/
-          cp strings.xml colors.xml $R/values/
-          for f in themes*.xml; do
-            if grep -q "Light" "$f"; then cp "$f" $R/values/themes.xml; else cp "$f" $R/values-night/themes.xml; fi
-          done
-          for f in logo*.png; do
-            if file "$f" | grep -q "512 x 512"; then cp "$f" $R/drawable-nodpi/logo.png; else cp "$f" $P/docs/logo.png; fi
-          done
-          cp ic_launcher_fg.png $R/drawable-nodpi/
-          cp ic_launcher.xml $R/mipmap-anydpi-v26/
-          cp index.html $P/docs/
-      - uses: actions/setup-java@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
-      - uses: android-actions/setup-android@v3
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 8.9
-      - run: gradle :app:assembleDebug --stacktrace
-        working-directory: work/NearChat
-      - run: cp work/NearChat/app/build/outputs/apk/debug/app-debug.apk work/NearChat/docs/NearChat.apk
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: NearChat (latest APK)
-          files: work/NearChat/docs/NearChat.apk
-          make_latest: true
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: work/NearChat/docs
-  pages:
-    needs: build
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    environment:
-      name: github-pages
-      url: ${{ steps.d.outputs.page_url }}
-    steps:
-      - id: d
-        uses: actions/deploy-pages@v4
+          java-version: '17'
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android Licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Give Gradle Permission
+        run: chmod +x gradlew
+
+      - name: Build NearChat APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NearChat-APK
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
