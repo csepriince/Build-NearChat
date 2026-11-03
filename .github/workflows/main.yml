@@ -1,91 +1,74 @@
-name: Build NearChat APK
-
+name: Build NearChat
 on:
   workflow_dispatch:
   push:
-    paths-ignore:
-      - "docs/NearChat.apk"
-
+    branches: [main]
 permissions:
   contents: write
-
+  pages: write
+  id-token: write
+concurrency:
+  group: nearchat-build
+  cancel-in-progress: true
 jobs:
   build:
-    name: Build Android APK
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - name: Rebuild project folders
+        run: |
+          set -e
+          P=work/NearChat
+          J=$P/app/src/main/java/com/nearchat/app
+          R=$P/app/src/main/res
+          mkdir -p $P/app/src/main $P/docs $J/core $J/ui $R/values $R/values-night $R/drawable-nodpi $R/mipmap-anydpi-v26
+          cp settings.gradle.kts gradle.properties $P/
+          for f in build.gradle*.kts; do
+            if grep -q namespace "$f"; then cp "$f" $P/app/build.gradle.kts; else cp "$f" $P/build.gradle.kts; fi
+          done
+          cp proguard-rules.pro $P/app/
+          cp AndroidManifest.xml $P/app/src/main/
+          cp MainActivity.kt $J/
+          cp App.kt Screens.kt Settings.kt Theme.kt Components.kt $J/ui/
+          cp BtController.kt ChatStore.kt Conn.kt Crypto.kt Media.kt Models.kt $J/core/
+          cp strings.xml colors.xml $R/values/
+          for f in themes*.xml; do
+            if grep -q "Light" "$f"; then cp "$f" $R/values/themes.xml; else cp "$f" $R/values-night/themes.xml; fi
+          done
+          for f in logo*.png; do
+            if file "$f" | grep -q "512 x 512"; then cp "$f" $R/drawable-nodpi/logo.png; else cp "$f" $P/docs/logo.png; fi
+          done
+          cp ic_launcher_fg.png $R/drawable-nodpi/
+          cp ic_launcher.xml $R/mipmap-anydpi-v26/
+          cp index.html $P/docs/
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
-
-      - name: Extract Source Code
-        run: |
-          mkdir -p work/NearChat
-          if [ -f source.zip ]; then
-            unzip -o source.zip -d work/NearChat
-          else
-            echo "ERROR: source.zip not found!"
-            exit 1
-          fi
-
-      - name: Locate Android Project
-        id: project
-        run: |
-          GRADLEW=$(find work/NearChat -type f -name gradlew | head -n 1)
-
-          if [ -z "$GRADLEW" ]; then
-            echo "ERROR: gradlew not found!"
-            exit 1
-          fi
-
-          PROJECT_ROOT=$(dirname "$GRADLEW")
-          echo "root=$PROJECT_ROOT" >> "$GITHUB_OUTPUT"
-
-          chmod +x "$GRADLEW"
-
-      - name: Build NearChat APK
-        working-directory: .
-        run: |
-          cd "${{ steps.project.outputs.root }}"
-          ./gradlew clean assembleDebug --no-daemon
-
-      - name: Copy APK
-        run: |
-          mkdir -p docs
-
-          APK=$(find work/NearChat -type f \
-            -path "*/build/outputs/apk/debug/*.apk" | head -n 1)
-
-          if [ -z "$APK" ]; then
-            echo "ERROR: APK not generated!"
-            exit 1
-          fi
-
-          cp "$APK" docs/NearChat.apk
-          echo "APK successfully generated!"
-
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
         with:
-          name: NearChat-APK
-          path: docs/NearChat.apk
+          gradle-version: 8.9
+      - run: gradle :app:assembleDebug --stacktrace
+        working-directory: work/NearChat
+      - run: cp work/NearChat/app/build/outputs/apk/debug/app-debug.apk work/NearChat/docs/NearChat.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: NearChat (latest APK)
+          files: work/NearChat/docs/NearChat.apk
+          make_latest: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: work/NearChat/docs
+  pages:
+    needs: build
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    environment:
+      name: github-pages
+      url: ${{ steps.d.outputs.page_url }}
+    steps:
+      - id: d
+        uses: actions/deploy-pages@v4
 
-      - name: Commit APK to Repository
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add docs/NearChat.apk
-
-          if ! git diff --cached --quiet; then
-            git commit -m "Build NearChat APK"
-            git push
-          else
-            echo "APK unchanged."
-          fi
