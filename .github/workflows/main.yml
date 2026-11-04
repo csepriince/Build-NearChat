@@ -18,19 +18,23 @@ jobs:
       - name: Rebuild project folders
         run: |
           set -e
+          if [ -f update.zip ]; then unzip -oq update.zip; echo "update.zip applied"; fi
           P=work/NearChat
-          J=$P/app/src/main/java/com/nearchat/app
           R=$P/app/src/main/res
-          mkdir -p $P/app/src/main $P/docs $J/core $J/ui $R/values $R/values-night $R/drawable-nodpi $R/mipmap-anydpi-v26
+          mkdir -p $P/app/src/main $P/docs $R/values $R/values-night $R/drawable-nodpi $R/mipmap-anydpi-v26 $R/xml
           cp settings.gradle.kts gradle.properties $P/
           for f in build.gradle*.kts; do
             if grep -q namespace "$f"; then cp "$f" $P/app/build.gradle.kts; else cp "$f" $P/build.gradle.kts; fi
           done
           cp proguard-rules.pro $P/app/
           cp AndroidManifest.xml $P/app/src/main/
-          cp MainActivity.kt $J/
-          cp App.kt Screens.kt Settings.kt Theme.kt Components.kt $J/ui/
-          cp BtController.kt ChatStore.kt Conn.kt Crypto.kt Media.kt Models.kt $J/core/
+          for f in *.kt; do
+            case "$f" in *" ("*) continue;; esac
+            pkg=$(grep -m1 '^package ' "$f" | sed 's/^package //' | tr -d '\r ')
+            d=$P/app/src/main/java/$(echo "$pkg" | tr . /)
+            mkdir -p "$d"
+            cp "$f" "$d/"
+          done
           cp strings.xml colors.xml $R/values/
           for f in themes*.xml; do
             if grep -q "Light" "$f"; then cp "$f" $R/values/themes.xml; else cp "$f" $R/values-night/themes.xml; fi
@@ -40,6 +44,7 @@ jobs:
           done
           cp ic_launcher_fg.png $R/drawable-nodpi/
           cp ic_launcher.xml $R/mipmap-anydpi-v26/
+          if [ -f file_paths.xml ]; then cp file_paths.xml $R/xml/; fi
           cp index.html $P/docs/
       - uses: actions/setup-java@v4
         with:
